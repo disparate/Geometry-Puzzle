@@ -1,6 +1,7 @@
 package by.kazarovets.geometrypuzzle
 
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.opengl.GLSurfaceView.Renderer
 import android.opengl.Matrix
@@ -33,8 +34,10 @@ import android.opengl.GLES20.GL_DEPTH_BUFFER_BIT
 import android.opengl.GLES20.GL_DEPTH_TEST
 import android.opengl.GLES20.glEnable
 import android.opengl.GLES20.glLineWidth
+import android.view.animation.AccelerateInterpolator
 import by.kazarovets.geometrypuzzle.utils.createProgram
 import by.kazarovets.geometrypuzzle.utils.createShader
+import timber.log.Timber
 
 class OpenGLRenderer(private val context: Context) : Renderer {
 
@@ -48,6 +51,8 @@ class OpenGLRenderer(private val context: Context) : Renderer {
     private val mViewMatrix = FloatArray(16)
     private val mMatrix = FloatArray(16)
 
+    private var cameraPoint = CameraPoint.oxy(3f)
+
     override fun onSurfaceCreated(arg0: GL10, arg1: EGLConfig) {
         glClearColor(0f, 0f, 0f, 1f)
         glEnable(GL_DEPTH_TEST)
@@ -55,7 +60,7 @@ class OpenGLRenderer(private val context: Context) : Renderer {
         val fragmentShaderId = createShader(context, GL_FRAGMENT_SHADER, R.raw.fragment_shader)
         programId = createProgram(vertexShaderId, fragmentShaderId)
         glUseProgram(programId)
-        createViewMatrix()
+        pointCamera()
         prepareData()
         bindData()
     }
@@ -68,23 +73,11 @@ class OpenGLRenderer(private val context: Context) : Renderer {
 
     private fun prepareData() {
 
-        val s = 0.4f
-        val d = 0.9f
-        val l = 3f
+        val s = 1f
+        val l = 10f
 
         val vertices = floatArrayOf(
 
-            // первый треугольник
-            -2 * s, -s, d, 2 * s, -s, d, 0f, s, d,
-
-            // второй треугольник
-            -2 * s, -s, -d, 2 * s, -s, -d, 0f, s, -d,
-
-            // третий треугольник
-            d, -s, -2 * s, d, -s, 2 * s, d, s, 0f,
-
-            // четвертый треугольник
-            -d, -s, -2 * s, -d, -s, 2 * s, -d, s, 0f,
 
             // ось X
             -l, 0f, 0f, l, 0f, 0f,
@@ -93,7 +86,18 @@ class OpenGLRenderer(private val context: Context) : Renderer {
             0f, -l, 0f, 0f, l, 0f,
 
             // ось Z
-            0f, 0f, -l, 0f, 0f, l
+            0f, 0f, -l, 0f, 0f, l,
+
+            // line 1
+            s, 0f, 0f, s, s, 0f,
+
+            // line 2
+            -s, s, 0f, -s, 2 * s, 0f,
+
+            //line 3
+            0f, 0f, 0f, 0f, s, s
+
+
         )
 
         vertexData = ByteBuffer
@@ -122,12 +126,12 @@ class OpenGLRenderer(private val context: Context) : Renderer {
 
     private fun createProjectionMatrix(width: Int, height: Int) {
         var ratio = 1f
-        var left = -1f
-        var right = 1f
-        var bottom = -1f
-        var top = 1f
-        val near = 2f
-        val far = 8f
+        var left = -4f
+        var right = 4f
+        var bottom = -4f
+        var top = 4f
+        val near = 1f
+        val far = 9f
         if (width > height) {
             ratio = width.toFloat() / height
             left *= ratio
@@ -138,26 +142,30 @@ class OpenGLRenderer(private val context: Context) : Renderer {
             top *= ratio
         }
 
-        Matrix.frustumM(mProjectionMatrix, 0, left, right, bottom, top, near, far)
+        Matrix.orthoM(mProjectionMatrix, 0, left, right, bottom, top, near, far)
     }
 
-    private fun createViewMatrix() {
-        // точка положения камеры
-        val eyeX = 0f
-        val eyeY = 0f
-        val eyeZ = 3f
+    fun pointCamera(cameraPoint: CameraPoint) {
+        ValueAnimator.ofObject(CameraPointEvaluator(), this.cameraPoint, cameraPoint).apply {
+            duration = 1000
+            interpolator = AccelerateInterpolator()
+            addUpdateListener {
+                this@OpenGLRenderer.cameraPoint = this.animatedValue as CameraPoint
+                pointCamera()
+            }
+            start()
+        }
+    }
 
-        // точка направления камеры
-        val centerX = 0f
-        val centerY = 0f
-        val centerZ = 0f
-
-        // up-вектор
-        val upX = 0f
-        val upY = 1f
-        val upZ = 0f
-
-        Matrix.setLookAtM(mViewMatrix, 0, eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ)
+    private fun pointCamera() {
+        cameraPoint.apply {
+            Matrix.setLookAtM(
+                mViewMatrix, 0,
+                fromX, fromY, fromZ,
+                toX, toY, toZ,
+                upX, upY, upZ
+            )
+        }
     }
 
 
@@ -167,32 +175,29 @@ class OpenGLRenderer(private val context: Context) : Renderer {
     }
 
     override fun onDrawFrame(arg0: GL10) {
+        bindMatrix()
         glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT)
-
-        // треугольники
-        glUniform4f(uColorLocation, 0.0f, 1.0f, 0.0f, 1.0f)
-        glDrawArrays(GL_TRIANGLES, 0, 3)
-
-        glUniform4f(uColorLocation, 0.0f, 0.0f, 1.0f, 1.0f)
-        glDrawArrays(GL_TRIANGLES, 3, 3)
-
-        glUniform4f(uColorLocation, 1.0f, 0.0f, 0.0f, 1.0f)
-        glDrawArrays(GL_TRIANGLES, 6, 3)
-
-        glUniform4f(uColorLocation, 1.0f, 1.0f, 0.0f, 1.0f)
-        glDrawArrays(GL_TRIANGLES, 9, 3)
 
         // оси
         glLineWidth(1f)
 
-        glUniform4f(uColorLocation, 0.0f, 1.0f, 1.0f, 1.0f)
-        glDrawArrays(GL_LINES, 12, 2)
+        glUniform4f(uColorLocation, 0.2f, 0.2f, 0.2f, 1.0f)
+        glDrawArrays(GL_LINES, 0, 2)
+        glDrawArrays(GL_LINES, 2, 2)
+        glDrawArrays(GL_LINES, 4, 2)
 
-        glUniform4f(uColorLocation, 1.0f, 0.0f, 1.0f, 1.0f)
-        glDrawArrays(GL_LINES, 14, 2)
 
-        glUniform4f(uColorLocation, 1.0f, 0.5f, 0.0f, 1.0f)
-        glDrawArrays(GL_LINES, 16, 2)
+        glLineWidth(3f)
+        // lines
+        glUniform4f(uColorLocation, 0f, 1.0f, 1.0f, 1.0f)
+        glDrawArrays(GL_LINES, 6, 2)
+
+        glUniform4f(uColorLocation, 1.0f, 1.0f, 0f, 1.0f)
+        glDrawArrays(GL_LINES, 8, 2)
+
+        glUniform4f(uColorLocation, 1.0f, 1.0f, 1.0f, 1.0f)
+        glDrawArrays(GL_LINES, 10, 2)
+
     }
 
     companion object {
