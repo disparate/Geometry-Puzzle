@@ -29,12 +29,12 @@ import android.opengl.GLES20.glUseProgram
 import android.opengl.GLES20.glVertexAttribPointer
 import android.opengl.GLES20.glViewport
 import android.opengl.GLES20.glUniformMatrix4fv
-import android.opengl.GLES20.GL_TRIANGLES
 import android.opengl.GLES20.GL_DEPTH_BUFFER_BIT
 import android.opengl.GLES20.GL_DEPTH_TEST
 import android.opengl.GLES20.glEnable
 import android.opengl.GLES20.glLineWidth
 import android.view.animation.AccelerateInterpolator
+import androidx.core.animation.doOnEnd
 import by.kazarovets.geometrypuzzle.utils.createProgram
 import by.kazarovets.geometrypuzzle.utils.createShader
 import timber.log.Timber
@@ -51,7 +51,14 @@ class OpenGLRenderer(private val context: Context) : Renderer {
     private val mViewMatrix = FloatArray(16)
     private val mMatrix = FloatArray(16)
 
-    private var cameraPoint = CameraPoint.oxy(3f)
+    private var historyRotateMatrix = FloatArray(16)
+    private val currRotateMatrix = FloatArray(16)
+    private val deltaRotateMatrix = FloatArray(16)
+
+    private var cameraPoint = CameraPoint(3f)
+
+    private var rotateAngle = 0f
+    private var rotateVector = Vector(1f, 0f, 0f)
 
     override fun onSurfaceCreated(arg0: GL10, arg1: EGLConfig) {
         glClearColor(0f, 0f, 0f, 1f)
@@ -68,6 +75,9 @@ class OpenGLRenderer(private val context: Context) : Renderer {
     override fun onSurfaceChanged(arg0: GL10, width: Int, height: Int) {
         glViewport(0, 0, width, height)
         createProjectionMatrix(width, height)
+        Matrix.setRotateM(currRotateMatrix, 0, 0f, 0f, 0f, 1f)
+        Matrix.setRotateM(historyRotateMatrix, 0, 0f, 0f, 0f, 1f)
+
         bindMatrix()
     }
 
@@ -145,13 +155,24 @@ class OpenGLRenderer(private val context: Context) : Renderer {
         Matrix.orthoM(mProjectionMatrix, 0, left, right, bottom, top, near, far)
     }
 
-    fun pointCamera(cameraPoint: CameraPoint) {
-        ValueAnimator.ofObject(CameraPointEvaluator(), this.cameraPoint, cameraPoint).apply {
-            duration = 1000
+    fun swipeCamera(swipeDirection: SwipeDirection) {
+        rotateVector = when(swipeDirection) {
+            SwipeDirection.RIGHT -> cameraPoint.upVector
+            SwipeDirection.LEFT -> cameraPoint.upVector.invert()
+            SwipeDirection.UP -> cameraPoint.upPerpendicularVector
+            SwipeDirection.BOTTOM -> cameraPoint.upPerpendicularVector.invert()
+        }
+        Timber.d("rotate $rotateVector")
+        ValueAnimator.ofFloat(0f, 90f).apply {
+            duration = 500
             interpolator = AccelerateInterpolator()
             addUpdateListener {
-                this@OpenGLRenderer.cameraPoint = this.animatedValue as CameraPoint
+                this@OpenGLRenderer.rotateAngle = this.animatedValue as Float
                 pointCamera()
+            }
+            doOnEnd {
+                rotateAngle = 0f
+                historyRotateMatrix = currRotateMatrix.clone() //TODO: check
             }
             start()
         }
@@ -166,11 +187,16 @@ class OpenGLRenderer(private val context: Context) : Renderer {
                 upX, upY, upZ
             )
         }
+
+        Matrix.setRotateM(deltaRotateMatrix, 0, rotateAngle,
+            rotateVector.x, rotateVector.y, rotateVector.z)
+        Matrix.multiplyMM(currRotateMatrix, 0, deltaRotateMatrix, 0, historyRotateMatrix, 0)
     }
 
 
     private fun bindMatrix() {
-        Matrix.multiplyMM(mMatrix, 0, mProjectionMatrix, 0, mViewMatrix, 0)
+        Matrix.multiplyMM(mMatrix, 0, mViewMatrix, 0, currRotateMatrix, 0)
+        Matrix.multiplyMM(mMatrix, 0, mProjectionMatrix,  0, mMatrix, 0)
         glUniformMatrix4fv(uMatrixLocation, 1, false, mMatrix, 0)
     }
 
@@ -181,7 +207,7 @@ class OpenGLRenderer(private val context: Context) : Renderer {
         // оси
         glLineWidth(1f)
 
-        glUniform4f(uColorLocation, 0.2f, 0.2f, 0.2f, 1.0f)
+        glUniform4f(uColorLocation, 0.33f, 0.33f, 0.33f, 1.0f)
         glDrawArrays(GL_LINES, 0, 2)
         glDrawArrays(GL_LINES, 2, 2)
         glDrawArrays(GL_LINES, 4, 2)

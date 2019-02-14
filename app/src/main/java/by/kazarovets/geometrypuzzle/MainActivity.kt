@@ -25,9 +25,24 @@ class MainActivity : AppCompatActivity() {
         renderer = OpenGLRenderer(this)
         glSurface.setRenderer(renderer)
 
-        fromX.setOnClickListener { renderer.pointCamera(CameraPoint.oyz(3f)) }
-        fromY.setOnClickListener { renderer.pointCamera(CameraPoint.ozx(3f)) }
-        fromZ.setOnClickListener { renderer.pointCamera(CameraPoint.oxy(3f)) }
+        glSurface.setOnTouchListener(object : OnSwipeTouchListener(this@MainActivity) {
+
+            override fun onSwipeBottom() {
+                renderer.swipeCamera(SwipeDirection.BOTTOM)
+            }
+
+            override fun onSwipeLeft() {
+                renderer.swipeCamera(SwipeDirection.LEFT)
+            }
+
+            override fun onSwipeRight() {
+                renderer.swipeCamera(SwipeDirection.RIGHT)
+            }
+
+            override fun onSwipeTop() {
+                renderer.swipeCamera(SwipeDirection.UP)
+            }
+        })
     }
 
     override fun onPause() {
