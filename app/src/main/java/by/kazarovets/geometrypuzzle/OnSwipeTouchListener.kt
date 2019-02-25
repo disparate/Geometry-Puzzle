@@ -9,7 +9,7 @@ import android.view.View
 import android.view.View.OnTouchListener
 
 
-open class OnSwipeTouchListener(ctx: Context) : OnTouchListener {
+open class OnSwipeTouchListener(val onClick: (MotionEvent) -> Unit, ctx: Context) : OnTouchListener {
 
     private val gestureDetector: GestureDetector
 
@@ -22,6 +22,11 @@ open class OnSwipeTouchListener(ctx: Context) : OnTouchListener {
     }
 
     private inner class GestureListener : SimpleOnGestureListener() {
+
+        override fun onSingleTapUp(e: MotionEvent?): Boolean {
+            e?.let(onClick)
+            return true
+        }
 
         override fun onDown(e: MotionEvent): Boolean {
             return true

@@ -3,6 +3,9 @@ package by.kazarovets.geometrypuzzle
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Bundle
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import by.kazarovets.geometrypuzzle.rendering.OpenGLRenderer
@@ -23,10 +26,24 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         glSurface.setEGLContextClientVersion(2)
-        renderer = OpenGLRenderer(this)
+        renderer = OpenGLRenderer()
         glSurface.setRenderer(renderer)
 
-        glSurface.setOnTouchListener(object : OnSwipeTouchListener(this@MainActivity) {
+        addTouchListeners()
+
+    }
+
+    private fun addTouchListeners() {
+
+        val onClick: (MotionEvent) -> Unit = {
+            if (it.x < (glSurface.width / 2) - glSurface.x) {
+                renderer.tryMoveLeft()
+            } else {
+                renderer.tryMoveRight()
+            }
+        }
+
+        val onSwipeTouchListener = object : OnSwipeTouchListener(onClick, this@MainActivity) {
 
             override fun onSwipeBottom() {
                 renderer.swipeCamera(SwipeDirection.BOTTOM)
@@ -43,7 +60,9 @@ class MainActivity : AppCompatActivity() {
             override fun onSwipeTop() {
                 renderer.swipeCamera(SwipeDirection.UP)
             }
-        })
+        }
+
+        glSurface.setOnTouchListener(onSwipeTouchListener)
     }
 
     override fun onPause() {
@@ -60,6 +79,12 @@ class MainActivity : AppCompatActivity() {
         val activityManager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val configurationInfo = activityManager.deviceConfigurationInfo
         return configurationInfo.reqGlEsVersion >= 0x20000
+    }
+
+
+    inner class SingleTapListener(val onClick: (MotionEvent) -> Unit) :
+        GestureDetector.SimpleOnGestureListener() {
+
     }
 
 }
