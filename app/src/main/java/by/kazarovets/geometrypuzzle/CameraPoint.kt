@@ -2,6 +2,7 @@ package by.kazarovets.geometrypuzzle
 
 import android.animation.FloatEvaluator
 import android.animation.TypeEvaluator
+import kotlin.math.absoluteValue
 import kotlin.reflect.KProperty1
 
 class CameraPoint constructor(val distance: Float = 0f) {
@@ -16,34 +17,29 @@ class CameraPoint constructor(val distance: Float = 0f) {
     val upZ: Float = 0f
 
 
-
     val upVector = Vector(upX, upY, upZ)
-    val fromVector = Vector(toX - fromX , toY - fromY, toZ - fromZ)
+    val fromVector = Vector(toX - fromX, toY - fromY, toZ - fromZ)
     val upPerpendicularVector = Vector(distance, 0f, 0f)
 }
 
 data class Vector(val x: Float, val y: Float, val z: Float) {
 
+    val eps = 0.0001f
     fun invert() = Vector(-x, -y, -z)
+
 }
 
 enum class SwipeDirection {
     RIGHT, LEFT, UP, BOTTOM
 }
 
-class CameraPointEvaluator : TypeEvaluator<CameraPoint> {
-    override fun evaluate(fraction: Float, startValue: CameraPoint?, endValue: CameraPoint?): CameraPoint {
-        if (startValue == null || endValue == null) return startValue ?: CameraPoint()
-
-        val floatEvaluator = FloatEvaluator()
-        fun evaluate(field: KProperty1<CameraPoint, Float>): Float {
-            return floatEvaluator.evaluate(fraction, field.get(startValue), field.get(endValue))
-        }
-
-
-        return CameraPoint(
-            evaluate(CameraPoint::fromX)
-        )
+data class Direction(val axis: Axis,
+                val inversed: Boolean = false) {
+    fun invert(): Direction {
+       return this.copy(inversed = this.inversed.not())
     }
+}
 
+enum class Axis {
+    Ox, Oy, Oz
 }

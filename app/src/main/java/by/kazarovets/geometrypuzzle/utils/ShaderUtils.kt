@@ -1,20 +1,7 @@
 package by.kazarovets.geometrypuzzle.utils
 
 
-import android.content.Context
-
-import android.opengl.GLES20.GL_COMPILE_STATUS
-import android.opengl.GLES20.GL_LINK_STATUS
-import android.opengl.GLES20.glAttachShader
-import android.opengl.GLES20.glCompileShader
-import android.opengl.GLES20.glCreateProgram
-import android.opengl.GLES20.glCreateShader
-import android.opengl.GLES20.glDeleteProgram
-import android.opengl.GLES20.glDeleteShader
-import android.opengl.GLES20.glGetProgramiv
-import android.opengl.GLES20.glGetShaderiv
-import android.opengl.GLES20.glLinkProgram
-import android.opengl.GLES20.glShaderSource
+import android.opengl.GLES20.*
 
 
 fun createProgram(vertexShaderId: Int, fragmentShaderId: Int): Int {
@@ -36,11 +23,6 @@ fun createProgram(vertexShaderId: Int, fragmentShaderId: Int): Int {
     }
     return programId
 
-}
-
-internal fun createShader(context: Context, type: Int, shaderRawId: Int): Int {
-    val shaderText = readTextFromRaw(context, shaderRawId)
-    return createShader(type, shaderText)
 }
 
 internal fun createShader(type: Int, shaderText: String): Int {
